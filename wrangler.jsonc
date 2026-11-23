@@ -1,0 +1,14 @@
+{
+  // Gabriel's rug site: public listing, one page per rug, and /admin for editing.
+  // Same setup as sunken.fyi: a Worker, D1 for the rug list, R2 for photos.
+  "name": "gabriels-rugs",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-16",
+  // Free address with no domain: https://gabriels-rugs.<your-subdomain>.workers.dev
+  "workers_dev": true,
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "gabriels-rugs-photos" }],
+  // Created automatically on first deploy.
+  "d1_databases": [{ "binding": "DB", "database_name": "gabriels-rugs" }]
+  // Secret, set in the Cloudflare dashboard (not in this file):
+  //   ADMIN_KEY   the password Gabriel types at /admin
+}
