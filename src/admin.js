@@ -1,10 +1,13 @@
 // /admin and /admin-api/*: Gabriel edits rugs and contact details here.
-// Unlocked with the ADMIN_KEY secret (same scheme as sunken.fyi/admin).
+// Sign-in and passwords: auth.js.
 import {
   listRugs, getRug, createRug, updateRug, deleteRug, nextNum, validateRug, getSettings, saveSettings, validateSettings,
 } from "./db.js";
 import { storePhoto, deletePhotos } from "./photos.js";
 import { ADMIN_PAGE } from "./admin-page.js";
+import {
+  passwordOk, hasOwnPassword, tooManyFails, recordFail, clearFails, newSession, sessionOk, endSession, setPassword, validateNewPassword,
+} from "./auth.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -18,17 +21,6 @@ async function body(request) {
   } catch {
     return null;
   }
-}
-
-export async function authorized(request, env) {
-  if (!env.ADMIN_KEY) return false;
-  const header = request.headers.get("authorization") || "";
-  const given = header.startsWith("Bearer ") ? header.slice(7) : "";
-  const enc = new TextEncoder();
-  const a = enc.encode(given);
-  const b = enc.encode(env.ADMIN_KEY);
-  if (a.byteLength !== b.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(a, b);
 }
 
 const duplicate = (e) => /UNIQUE/i.test(String(e?.message || e));
@@ -48,15 +40,40 @@ export async function handleAdmin(request, env) {
     });
   }
   if (!pathname.startsWith("/admin-api/")) return null;
-  if (!(await authorized(request, env))) {
-    await new Promise((r) => setTimeout(r, 600)); // slows down password guessing
-    return json({ error: "That password isn't right." }, 401);
-  }
   const route = `${request.method} ${pathname.replace(/\/$/, "")}`;
 
+  if (route === "POST /admin-api/login") {
+    const ip = request.headers.get("cf-connecting-ip") || "local";
+    if (await tooManyFails(env, ip)) return json({ error: "Too many wrong passwords. Wait 15 minutes and try again." }, 429);
+    const b = await body(request);
+    if (!(await passwordOk(env, b?.password))) {
+      await recordFail(env, ip);
+      await new Promise((r) => setTimeout(r, 600)); // slows down password guessing
+      return json({ error: "That password isn't right." }, 401);
+    }
+    await clearFails(env, ip);
+    return json({ token: await newSession(env) });
+  }
+
+  if (!(await sessionOk(env, request))) return json({ error: "Please sign in again." }, 401);
+
+  if (route === "POST /admin-api/logout") {
+    await endSession(env, request);
+    return json({ ok: true });
+  }
+
+  if (route === "PUT /admin-api/password") {
+    const b = await body(request);
+    if (!(await passwordOk(env, b?.current))) return json({ error: "Your current password isn't right." }, 403);
+    const problem = validateNewPassword(b?.password, env);
+    if (problem) return json({ error: problem }, 400);
+    await setPassword(env, request, b.password);
+    return json({ ok: true, ownPassword: true });
+  }
+
   if (route === "GET /admin-api/rugs") {
-    const [rugs, settings, n] = await Promise.all([listRugs(env, { includeHidden: true }), getSettings(env), nextNum(env)]);
-    return json({ rugs, settings, nextNum: n });
+    const [rugs, settings, n, own] = await Promise.all([listRugs(env, { includeHidden: true }), getSettings(env), nextNum(env), hasOwnPassword(env)]);
+    return json({ rugs, settings, nextNum: n, ownPassword: own });
   }
 
   if (route === "POST /admin-api/rugs") {

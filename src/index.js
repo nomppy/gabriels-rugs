@@ -37,6 +37,7 @@ export default {
       const rug = await getRugByNum(env, Number(m[1]));
       if (rug && rug.status !== "hidden") return new Response(rugPage(settings, rug, { origin: url.origin }), { headers: PAGE_HEADERS });
     }
+    if (url.pathname === "/favicon.ico") return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
     if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /admin\n", { headers: { "content-type": "text/plain" } });
     return new Response(notFoundPage(settings), { status: 404, headers: { ...PAGE_HEADERS, "cache-control": "no-store" } });
   },

@@ -7,7 +7,11 @@ and it needs no domain: it lives at `gabriels-rugs.<subdomain>.workers.dev`.
 
 ## For Gabriel: editing the site
 
-Open **/admin** on your phone and enter the password. It stays remembered on that phone.
+Open **/admin** on your phone and sign in. It stays signed in on that phone.
+
+- **Your password:** the first time, sign in with the password you were given,
+  then go to **Contact & shop info → Change password** and pick your own (at
+  least 10 characters). Changing it signs out every other phone or computer.
 
 - **Add a rug:** tap **+ Add a rug**, add photos (first one is the cover),
   type the width and length in feet and inches, and the price. Leave the price
@@ -31,7 +35,19 @@ uploads are quick. Location data is stripped before anything is saved.
 | --- | --- |
 | `/` | All rugs, newest first, sold ones last. `?size=runner\|small\|medium\|large` filters. |
 | `/rug/<number>` | One rug: photos, size, pile, material, condition, description. Share previews show the cover photo. |
-| `/admin` | Editing page (password: the `ADMIN_KEY` secret). |
+| `/admin` | Editing page. |
+
+## Passwords
+
+- **Gabriel's password** is set and changed at `/admin`. It's stored hashed
+  (PBKDF2) in D1, never in plain text.
+- **`ADMIN_KEY`** (a Cloudflare secret) is the **recovery password**. It always
+  signs in, so if Gabriel forgets his password, sign in with it and set a new one.
+  Keep it to yourself.
+- Signing in gives that device a session token (kept 180 days); the password
+  itself isn't stored on the phone. Signing out ends that session.
+- 8 wrong passwords from one connection within 15 minutes locks that
+  connection out for 15 minutes.
 
 Sizes sort themselves: long and narrow (at most 3'6" wide, 2.5× as long) is a
 runner; otherwise by floor area: under 40 sq ft is small, under 76 is medium,
@@ -44,7 +60,8 @@ runner; otherwise by floor area: under 40 sq ft is small, under 76 is medium,
    pick this repo → Deploy. The D1 database and R2 bucket are created on the
    first deploy.
 3. In the Worker → **Settings → Variables and Secrets**, add a secret
-   **`ADMIN_KEY`**: Gabriel's password. Make it long, because it's the only lock.
+   **`ADMIN_KEY`**: the recovery password. Make it long. Give it to Gabriel
+   for his first sign-in, and he then sets his own.
 4. Open `https://gabriels-rugs.<subdomain>.workers.dev/admin`, sign in, and fill
    in **Contact & shop info** first.
 
@@ -59,6 +76,6 @@ npm run dev      # http://localhost:8787
 npm test
 ```
 
-Reused from sunken.fyi: the password check (`authorized`), `jpeg.js`
+Reused from sunken.fyi: the admin page pattern, `jpeg.js`
 (JPEG size and location stripping) and the admin page's HEIC-to-JPEG
 conversion.

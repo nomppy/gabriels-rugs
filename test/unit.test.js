@@ -70,3 +70,17 @@ test("pages escape user text", () => {
     assert.ok(!html.includes("<b>Shop</b>"));
   }
 });
+
+import { hashPassword, validateNewPassword } from "../src/auth.js";
+
+test("password hashing", async () => {
+  const h = await hashPassword("correct horse battery");
+  assert.match(h, /^pbkdf2\$20000\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  const [, it, salt] = h.split("$");
+  assert.equal(await hashPassword("correct horse battery", salt, Number(it)), h);
+  assert.notEqual(await hashPassword("correct horse batterx", salt, Number(it)), h);
+  assert.notEqual(await hashPassword("correct horse battery"), h); // new salt each time
+  assert.ok(validateNewPassword("short", {}));
+  assert.ok(validateNewPassword("same-as-recovery", { ADMIN_KEY: "same-as-recovery" }));
+  assert.equal(validateNewPassword("a long enough phrase", { ADMIN_KEY: "x" }), null);
+});

@@ -104,7 +104,18 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
       </div>
       <button class="primary wide" type="submit">Save shop info</button>
       <p class="status" id="shop-status" role="status"></p>
-      <button id="signout" class="link small up" type="button" style="margin-top:40px">Sign out on this phone</button>
+    </form>
+
+    <form data-panel="shop" id="pwform" hidden style="margin-top:40px;padding-top:24px;border-top:1px solid var(--line)">
+      <h2 class="up small" style="font-weight:500;margin:0 0 6px">Change password</h2>
+      <p class="hint" id="pw-hint" style="margin:0 0 16px">Changing it signs out every other phone or computer.</p>
+      <input type="text" autocomplete="username" value="admin" hidden aria-hidden="true" tabindex="-1">
+      <div class="field"><label for="pw-current">Current password</label><input id="pw-current" type="password" autocomplete="current-password" required></div>
+      <div class="field"><label for="pw-new">New password</label><input id="pw-new" type="password" autocomplete="new-password" minlength="10" required><p class="hint">At least 10 characters. A short phrase is easiest to remember.</p></div>
+      <div class="field"><label for="pw-again">New password again</label><input id="pw-again" type="password" autocomplete="new-password" required></div>
+      <button class="primary wide" type="submit">Change password</button>
+      <p class="status" id="pw-status" role="status"></p>
+      <button id="signout" class="link small up" type="button" style="margin-top:24px">Sign out on this device</button>
     </form>
   </section>
 
@@ -160,13 +171,13 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
   const state = { rugs: [], settings: {}, nextNum: 1, editing: null, photos: [], uploaded: [], uploading: 0 };
 
   const store = {
-    get() { try { return localStorage.getItem("rugs-admin-key"); } catch { return null; } },
-    set(v) { try { localStorage.setItem("rugs-admin-key", v); } catch {} },
-    clear() { try { localStorage.removeItem("rugs-admin-key"); } catch {} },
+    get() { try { return localStorage.getItem("rugs-admin-token"); } catch { return null; } },
+    set(v) { try { localStorage.setItem("rugs-admin-token", v); } catch {} },
+    clear() { try { localStorage.removeItem("rugs-admin-token"); } catch {} },
   };
 
   async function api(method, path, body, raw) {
-    const headers = { authorization: "Bearer " + key };
+    const headers = key ? { authorization: "Bearer " + key } : {};
     if (body !== undefined && !raw) headers["content-type"] = "application/json";
     let res;
     try { res = await fetch(path, { method, headers, body: raw ? body : body === undefined ? undefined : JSON.stringify(body) }); }
@@ -188,11 +199,27 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
   // ---------- sign in
   $("lock-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    key = $("pw").value;
-    try { await load(); store.set(key); $("pw").value = ""; screen("home"); }
-    catch (err) { lock(err.status === 401 ? "That password isn't right." : err.message); }
+    key = null;
+    try {
+      const r = await api("POST", "/admin-api/login", { password: $("pw").value });
+      key = r.token; store.set(key); $("pw").value = "";
+      await load(); screen("home");
+    } catch (err) { lock(err.message); }
   });
-  $("signout").addEventListener("click", () => lock(""));
+  $("signout").addEventListener("click", async () => { await api("POST", "/admin-api/logout").catch(() => {}); lock(""); });
+
+  // ---------- password
+  $("pwform").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("pw-new").value !== $("pw-again").value) { status("pw-status", "The two new passwords don't match.", "error"); return; }
+    status("pw-status", "Saving…");
+    try {
+      await api("PUT", "/admin-api/password", { current: $("pw-current").value, password: $("pw-new").value });
+      for (const id of ["pw-current", "pw-new", "pw-again"]) $(id).value = "";
+      state.ownPassword = true; fillShop();
+      status("pw-status", "Password changed. Use the new one next time you sign in.", "ok");
+    } catch (err) { status("pw-status", err.message, "error"); if (err.status === 401) lock(); }
+  });
 
   // ---------- tabs
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
@@ -203,7 +230,7 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
   // ---------- rug list
   async function load() {
     const r = await api("GET", "/admin-api/rugs");
-    state.rugs = r.rugs; state.settings = r.settings; state.nextNum = r.nextNum;
+    state.rugs = r.rugs; state.settings = r.settings; state.nextNum = r.nextNum; state.ownPassword = r.ownPassword;
     renderList(); fillShop();
   }
 
@@ -251,7 +278,12 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
 
   // ---------- shop info
   const SHOP = ["shopName", "tagline", "area", "phone", "instagram", "payment", "banner", "intro"];
-  function fillShop() { for (const k of SHOP) $("s-" + k).value = state.settings[k] || ""; }
+  function fillShop() {
+    for (const k of SHOP) $("s-" + k).value = state.settings[k] || "";
+    $("pw-hint").textContent = state.ownPassword
+      ? "Changing it signs out every other phone or computer."
+      : "No password of your own yet: you're using the recovery key. Set your own here; the recovery key keeps working as a backup.";
+  }
   $("shop").addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = {}; for (const k of SHOP) body[k] = $("s-" + k).value;

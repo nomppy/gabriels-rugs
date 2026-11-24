@@ -65,6 +65,7 @@ img { display: block; }
 .how h2 { margin: 0 0 6px; font-size: 12px; font-weight: 400; color: var(--muted); text-transform: uppercase; }
 .how p { margin: 0; }
 body { padding-bottom: 92px; }
+.desk { display: none; }
 .cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; padding: 12px 14px calc(20px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--line); }
 .cta a { min-height: 48px; display: flex; align-items: center; justify-content: center; background: #111; color: #fff; font-size: 13px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; text-decoration: none; }
 /* rug page */
@@ -100,6 +101,7 @@ dt { color: var(--muted); } dd { margin: 0; text-align: right; }
   .info { padding: 0; position: sticky; top: 24px; }
   .info h1 { font-size: 28px; }
   body { padding-bottom: 0; }
+  .desk { display: inline; }
   .cta { position: static; border: 0; padding: 0; }
   .list-cta { display: none; }
 }
@@ -151,7 +153,9 @@ function ctaHtml(s, rug) {
       ? "Sold. Ask me for something similar"
       : `${viaIg ? "Message me" : "Text me"} about No. ${pad(rug.num)}`
     : `${viaIg ? "Message me" : "Text me"} about a rug`;
-  return `<div class="cta"><a href="${esc(href)}">${esc(label)}</a></div>`;
+  // Computers mostly can't send texts, so desktop also shows the number.
+  const number = viaIg ? `@${s.instagram}` : s.phone;
+  return `<div class="cta"><a href="${esc(href)}">${esc(label)}<span class="desk">&nbsp;· ${esc(number)}</span></a></div>`;
 }
 
 function howHtml(s) {
@@ -186,7 +190,7 @@ export function listPage(s, rugs, { origin, size = "" }) {
   const igOrText = contactLink(s, null);
   const body = `${header(s, {
     left: `<a class="side up" href="#rugs">Sizes</a>`,
-    right: igOrText ? `<a class="side up end" href="${esc(igOrText)}">${s.phone ? "Text" : "Message"}</a>` : "<span></span>",
+    right: igOrText ? `<a class="side up end" href="${esc(igOrText)}">${s.phone ? "Text" : "Message"}<span class="desk">&nbsp;${esc(s.phone || "@" + s.instagram)}</span></a>` : "<span></span>",
   })}
 ${heroRug ? `<section class="hero"><img src="${photoUrl(heroRug.photos[0].id)}" alt="">${s.banner ? `<a class="up" href="#rugs">${esc(s.banner)} ${arrow}</a>` : ""}</section>` : ""}
 <main id="rugs">
