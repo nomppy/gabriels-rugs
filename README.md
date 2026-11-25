@@ -3,7 +3,7 @@
 A rug listing site with one page per rug and an editing page at `/admin`.
 It runs on the same setup as sunken.fyi: one Cloudflare Worker, a D1
 database for the rug list and an R2 bucket for photos. The free tier covers it,
-and it needs no domain: it lives at `gabriels-rugs.<subdomain>.workers.dev`.
+and lives at **https://rugs.sunken.fyi** (also `gabriels-rugs.kennett-sun.workers.dev`).
 
 ## For Gabriel: editing the site
 

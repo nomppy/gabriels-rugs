@@ -6,6 +6,8 @@
   "compatibility_date": "2026-11-16",
   // Free address with no domain: https://gabriels-rugs.<your-subdomain>.workers.dev
   "workers_dev": true,
+  // Main address.
+  "routes": [{ "pattern": "rugs.sunken.fyi", "custom_domain": true }],
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "gabriels-rugs-photos" }],
   // Created automatically on first deploy.
   "d1_databases": [{ "binding": "DB", "database_name": "gabriels-rugs" }]
