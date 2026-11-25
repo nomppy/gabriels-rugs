@@ -28,6 +28,12 @@ export async function ensureSchema(env) {
     ),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
   ]);
+  // Added after launch: marks sample rugs so they can be removed in one go.
+  try {
+    await env.DB.prepare("ALTER TABLE rugs ADD COLUMN sample INTEGER NOT NULL DEFAULT 0").run();
+  } catch (e) {
+    if (!/duplicate column/i.test(String(e?.message || e))) throw e;
+  }
   ready = true;
 }
 
@@ -100,6 +106,7 @@ export function rowToRug(r) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     soldAt: r.sold_at,
+    sample: !!r.sample,
   };
 }
 
@@ -164,6 +171,7 @@ export function validateRug(input, { partial = false } = {}) {
     if (!STATUSES.includes(s)) return { ok: false, error: "Unknown status." };
     v.status = s;
   }
+  if (has("sample")) v.sample = !!input.sample;
   if (has("photos")) {
     if (!Array.isArray(input.photos) || input.photos.length > 12) return { ok: false, error: "Up to 12 photos per rug." };
     const photos = [];
@@ -186,12 +194,12 @@ export async function createRug(env, v) {
   const id = crypto.randomUUID();
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO rugs (id, num, name, width_in, length_in, pile, material, condition, price, description, status, photos, created_at, updated_at, sold_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO rugs (id, num, name, width_in, length_in, pile, material, condition, price, description, status, photos, created_at, updated_at, sold_at, sample)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id, v.num, v.name, v.widthIn, v.lengthIn, v.pile ?? "", v.material ?? "", v.condition ?? "", v.price ?? null,
-      v.description ?? "", v.status, JSON.stringify(v.photos ?? []), now, now, v.status === "sold" ? now : null,
+      v.description ?? "", v.status, JSON.stringify(v.photos ?? []), now, now, v.status === "sold" ? now : null, v.sample ? 1 : 0,
     )
     .run();
   return getRug(env, id);
@@ -218,6 +226,14 @@ export async function updateRug(env, id, v, before) {
   binds.push(Date.now());
   await env.DB.prepare(`UPDATE rugs SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
   return getRug(env, id);
+}
+
+// Removes every sample rug; returns their photo ids so the photos can go too.
+export async function deleteSamples(env) {
+  await ensureSchema(env);
+  const { results } = await env.DB.prepare("SELECT * FROM rugs WHERE sample = 1").all();
+  await env.DB.prepare("DELETE FROM rugs WHERE sample = 1").run();
+  return { count: results.length, photoIds: results.flatMap((r) => rowToRug(r).photos.map((p) => p.id)) };
 }
 
 export async function deleteRug(env, id) {

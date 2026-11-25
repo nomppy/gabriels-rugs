@@ -1,7 +1,7 @@
 // /admin and /admin-api/*: Gabriel edits rugs and contact details here.
 // Sign-in and passwords: auth.js.
 import {
-  listRugs, getRug, createRug, updateRug, deleteRug, nextNum, validateRug, getSettings, saveSettings, validateSettings,
+  listRugs, getRug, createRug, updateRug, deleteRug, deleteSamples, nextNum, validateRug, getSettings, saveSettings, validateSettings,
 } from "./db.js";
 import { storePhoto, deletePhotos } from "./photos.js";
 import { ADMIN_PAGE } from "./admin-page.js";
@@ -127,6 +127,12 @@ export async function handleAdmin(request, env) {
     const inUse = (await listRugs(env, { includeHidden: true })).some((r) => r.photos.some((p) => p.id === drop[1]));
     if (!inUse) await deletePhotos(env, [drop[1]]);
     return json({ deleted: !inUse });
+  }
+
+  if (route === "DELETE /admin-api/samples") {
+    const { count, photoIds } = await deleteSamples(env);
+    await deletePhotos(env, photoIds);
+    return json({ deleted: count });
   }
 
   if (route === "PUT /admin-api/settings") {

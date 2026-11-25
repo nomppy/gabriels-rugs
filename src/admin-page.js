@@ -86,6 +86,11 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
 
     <div data-panel="rugs">
       <button class="primary wide" type="button" id="add">+ Add a rug</button>
+      <div id="samples-bar" class="small" style="margin-top:12px;padding:12px;background:#F5F1EB;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">
+        <span id="samples-text" class="muted">Want to see how the site looks first? Add a few sample rugs.</span>
+        <button type="button" id="samples-add">Add sample rugs</button>
+        <button type="button" id="samples-remove" class="danger" hidden>Remove samples</button>
+      </div>
       <p class="status" id="list-status" role="status"></p>
       <p class="small muted" id="counts"></p>
       <ul class="rugs" id="rugs"></ul>
@@ -239,6 +244,13 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
     const c = { available: 0, hold: 0, sold: 0, hidden: 0 };
     state.rugs.forEach((r) => c[r.status]++);
     $("counts").textContent = state.rugs.length ? c.available + " available · " + c.hold + " on hold · " + c.sold + " sold" + (c.hidden ? " · " + c.hidden + " hidden" : "") : "No rugs yet. Add your first one.";
+    const samples = state.rugs.filter((r) => r.sample).length;
+    $("samples-add").hidden = samples > 0;
+    $("samples-remove").hidden = samples === 0;
+    $("samples-bar").hidden = samples === 0 && state.rugs.length > 0;
+    $("samples-text").textContent = samples
+      ? samples + " sample rug" + (samples === 1 ? " is" : "s are") + " on the site. Remove them before the real ones go up."
+      : "Want to see how the site looks first? Add a few sample rugs.";
     const ul = $("rugs"); ul.replaceChildren();
     for (const r of state.rugs) ul.append(rugRow(r));
   }
@@ -258,7 +270,7 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
     const price = r.price != null ? "$" + r.price.toLocaleString("en-US") : "Ask";
     const meta = el("div", { className: "meta" },
       el("b", { textContent: "No. " + pad(r.num) + " · " + r.name }),
-      el("span", { className: "small muted", textContent: sizeLabel(r.widthIn, r.lengthIn) + " · " + price + (r.status === "hidden" ? " · Hidden" : "") }),
+      el("span", { className: "small muted", textContent: sizeLabel(r.widthIn, r.lengthIn) + " · " + price + (r.status === "hidden" ? " · Hidden" : "") + (r.sample ? " · Sample" : "") }),
       seg,
       el("div", {}, edit),
     );
@@ -404,6 +416,141 @@ export const ADMIN_PAGE = /* html */ `<!doctype html>
     catch (err) { status("ed-status-msg", err.message, "error"); }
   });
   $("add").addEventListener("click", () => openEditor(null));
+
+  // ---------- sample rugs (for trying the site out; removable in one tap)
+  const SAMPLES = [
+    { name: "Red medallion", w: [8, 0], l: [10, 0], price: 280, pile: "Low", material: "Wool", condition: "Good, light wear on one corner", status: "available", look: "medallion", c: ["#8E2F24", "#E2C9A6", "#22345E", "#B6553F"] },
+    { name: "Blue and ivory runner", w: [2, 6], l: [10, 0], price: 90, pile: "Flatweave", material: "Cotton", condition: "Very good", status: "available", look: "stripes", c: ["#22345E", "#E9E1CF", "#4A6391", "#A8322B"] },
+    { name: "Green geometric", w: [7, 7], l: [9, 0], price: null, pile: "Low", material: "Wool blend", condition: "Good", status: "available", look: "diamonds", c: ["#2F5141", "#D9CFB2", "#5F7F61", "#8E2F24"] },
+    { name: "Mustard kilim", w: [4, 0], l: [6, 0], price: 60, pile: "Flatweave", material: "Wool", condition: "Very good", status: "sold", look: "kilim", c: ["#C99A2E", "#5B4423", "#E7CF8A", "#8E2F24"] },
+    { name: "Cream shag", w: [5, 0], l: [8, 0], price: 150, pile: "High", material: "Synthetic", condition: "Good, freshly cleaned", status: "available", look: "shag", c: ["#E8DFCC", "#D6CAB1", "#C9BC9F", "#F3ECDD"] },
+    { name: "Navy oriental", w: [9, 0], l: [12, 0], price: 420, pile: "Medium", material: "Wool", condition: "Good, small repair on one edge", status: "available", look: "medallion", c: ["#1E2A4A", "#D9C9A3", "#8E2F24", "#2E4170"] },
+    { name: "Faded rust vintage", w: [6, 0], l: [9, 0], price: 180, pile: "Low", material: "Wool", condition: "Sun-faded, no stains", status: "hold", look: "diamonds", c: ["#A2522F", "#E2C9A6", "#6E3A28", "#C27A54"] },
+    { name: "Small entry kilim", w: [3, 0], l: [5, 0], price: 45, pile: "Flatweave", material: "Wool", condition: "Very good", status: "available", look: "kilim", c: ["#2F3D5C", "#E9E1CF", "#8E2F24", "#C9A24A"] },
+  ];
+
+  function drawRug(ctx, x, y, w, h, s, rnd) {
+    const [a, b, c, d] = s.c;
+    const unit = Math.min(w, h);
+    ctx.save();
+    // fringe on the short ends
+    ctx.strokeStyle = "#EFE8DA"; ctx.lineWidth = Math.max(2, unit * 0.006);
+    for (let i = x + 4; i < x + w - 4; i += unit * 0.018) {
+      ctx.beginPath(); ctx.moveTo(i, y); ctx.lineTo(i + rnd() * 4 - 2, y - unit * 0.05); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i, y + h); ctx.lineTo(i + rnd() * 4 - 2, y + h + unit * 0.05); ctx.stroke();
+    }
+    ctx.shadowColor = "rgba(40,30,20,0.28)"; ctx.shadowBlur = unit * 0.06; ctx.shadowOffsetY = unit * 0.02;
+    ctx.fillStyle = a; ctx.fillRect(x, y, w, h);
+    ctx.shadowColor = "transparent";
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    if (s.look === "stripes") {
+      const band = unit * 0.07, cols = [a, b, c, b];
+      for (let i = 0, yy = y; yy < y + h; i++, yy += band) { ctx.fillStyle = cols[i % 4]; ctx.fillRect(x, yy, w, band * (i % 4 === 1 ? 0.5 : 1)); }
+      ctx.fillStyle = d; ctx.fillRect(x + w * 0.42, y, w * 0.16, h);
+    } else if (s.look === "kilim") {
+      const t = unit * 0.16, cols = [b, c, d];
+      for (let r = 0, yy = y; yy < y + h; r++, yy += t) {
+        for (let xx = x - t; xx < x + w + t; xx += t) {
+          ctx.fillStyle = cols[(r + Math.round((xx - x) / t)) % 3];
+          ctx.beginPath(); ctx.moveTo(xx, yy + t); ctx.lineTo(xx + t / 2, yy + t * 0.15); ctx.lineTo(xx + t, yy + t); ctx.fill();
+        }
+      }
+    } else if (s.look === "shag") {
+      for (let i = 0; i < 9000; i++) {
+        const px = x + rnd() * w, py = y + rnd() * h, ang = rnd() * Math.PI * 2, len = unit * (0.01 + rnd() * 0.02);
+        ctx.strokeStyle = s.c[1 + Math.floor(rnd() * 3)]; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(ang) * len, py + Math.sin(ang) * len); ctx.stroke();
+      }
+    } else {
+      // border bands
+      const bw = unit * 0.09;
+      ctx.fillStyle = c; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = b; ctx.fillRect(x + bw * 0.35, y + bw * 0.35, w - bw * 0.7, h - bw * 0.7);
+      ctx.fillStyle = d; ctx.fillRect(x + bw * 0.6, y + bw * 0.6, w - bw * 1.2, h - bw * 1.2);
+      ctx.fillStyle = a; ctx.fillRect(x + bw, y + bw, w - bw * 2, h - bw * 2);
+      const cx = x + w / 2, cy = y + h / 2;
+      if (s.look === "medallion") {
+        const rings = [b, c, d, b, a, c];
+        for (let i = 0; i < rings.length; i++) {
+          const k = 1 - i * 0.15;
+          ctx.fillStyle = rings[i];
+          ctx.beginPath(); ctx.moveTo(cx, cy - h * 0.3 * k); ctx.lineTo(cx + w * 0.3 * k, cy); ctx.lineTo(cx, cy + h * 0.3 * k); ctx.lineTo(cx - w * 0.3 * k, cy); ctx.fill();
+        }
+        for (const [qx, qy] of [[x + bw, y + bw], [x + w - bw, y + bw], [x + bw, y + h - bw], [x + w - bw, y + h - bw]]) {
+          ctx.fillStyle = d; ctx.beginPath(); ctx.arc(qx, qy, unit * 0.16, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = b; ctx.beginPath(); ctx.arc(qx, qy, unit * 0.1, 0, Math.PI * 2); ctx.fill();
+        }
+      } else {
+        const step = unit * 0.14;
+        ctx.strokeStyle = b; ctx.lineWidth = unit * 0.018;
+        for (let yy = y + bw; yy < y + h - bw + step; yy += step) for (let xx = x + bw; xx < x + w - bw + step; xx += step) {
+          ctx.beginPath(); ctx.moveTo(xx, yy - step / 2); ctx.lineTo(xx + step / 2, yy); ctx.lineTo(xx, yy + step / 2); ctx.lineTo(xx - step / 2, yy); ctx.closePath(); ctx.stroke();
+          ctx.fillStyle = c; ctx.fillRect(xx - unit * 0.012, yy - unit * 0.012, unit * 0.024, unit * 0.024);
+        }
+      }
+    }
+    // worn, woven texture
+    for (let i = 0; i < 14000; i++) {
+      ctx.fillStyle = rnd() < 0.5 ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)";
+      ctx.fillRect(x + rnd() * w, y + rnd() * h, 2, 2);
+    }
+    ctx.restore();
+  }
+
+  // Photo 1: the whole rug from above. Photo 2: a close-up of one corner.
+  function samplePhoto(s, which, seed) {
+    let n = seed;
+    const rnd = () => ((n = (n * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const W = 1200, H = 1320;
+    const cv = Object.assign(document.createElement("canvas"), { width: W, height: H });
+    const ctx = cv.getContext("2d");
+    const short = s.w[0] * 12 + s.w[1], long = s.l[0] * 12 + s.l[1];
+    if (which === 0) {
+      ctx.fillStyle = "#E7DFD8"; ctx.fillRect(0, 0, W, H);
+      const scale = Math.min((W * 0.78) / short, (H * 0.78) / long);
+      const rw = short * scale, rh = long * scale;
+      drawRug(ctx, (W - rw) / 2, (H - rh) / 2, rw, rh, s, rnd);
+    } else {
+      const rw = W * 2.6, rh = rw * (long / short);
+      drawRug(ctx, -W * 0.25, -H * 0.2, rw, rh, s, rnd);
+    }
+    return cv;
+  }
+
+  async function uploadCanvas(cv) {
+    const bmp = await createImageBitmap(cv);
+    const big = await resized(bmp, 2000, 0.85), small = await resized(bmp, 700, 0.8);
+    const p = await api("POST", "/admin-api/photos", big, true);
+    await api("PUT", "/admin-api/photos/" + p.id + "/small", small, true);
+    return { id: p.id, w: p.w, h: p.h };
+  }
+
+  $("samples-add").addEventListener("click", async () => {
+    $("samples-add").disabled = true;
+    let num = state.nextNum;
+    try {
+      for (let i = 0; i < SAMPLES.length; i++) {
+        const s = SAMPLES[i];
+        status("list-status", "Adding sample rug " + (i + 1) + " of " + SAMPLES.length + "…");
+        const photos = [await uploadCanvas(samplePhoto(s, 0, i + 7)), await uploadCanvas(samplePhoto(s, 1, i + 7))];
+        await api("POST", "/admin-api/rugs", {
+          num: num++, name: s.name, width: { ft: s.w[0], in: s.w[1] }, length: { ft: s.l[0], in: s.l[1] },
+          price: s.price === null ? "" : String(s.price), pile: s.pile, material: s.material, condition: s.condition,
+          description: "Sample listing to try out the site. Not a real rug.", status: s.status, photos, sample: true,
+        });
+      }
+      await load();
+      status("list-status", "Added " + SAMPLES.length + " sample rugs. Remove them before the real ones go up.", "ok");
+    } catch (err) { await load().catch(() => {}); status("list-status", err.message, "error"); if (err.status === 401) lock(); }
+    $("samples-add").disabled = false;
+  });
+
+  $("samples-remove").addEventListener("click", async () => {
+    if (!confirm("Remove all sample rugs and their photos? Your real rugs stay.")) return;
+    try { const r = await api("DELETE", "/admin-api/samples"); await load(); status("list-status", "Removed " + r.deleted + " sample rugs.", "ok"); }
+    catch (err) { status("list-status", err.message, "error"); if (err.status === 401) lock(); }
+  });
+
 
   // ---------- start
   key = store.get();
